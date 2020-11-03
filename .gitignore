@@ -1,3 +1,8 @@
+#data
+#data/*
+
+#scratch
+#scratch/*
 
 # Created by https://www.toptal.com/developers/gitignore/api/pycharm+all,python,macos
 # Edit at https://www.toptal.com/developers/gitignore?templates=pycharm+all,python,macos
