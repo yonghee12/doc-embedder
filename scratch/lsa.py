@@ -1,11 +1,7 @@
-from gensim import corpora, models
-import logging
-
 from doc_embedder.modules import *
 from doc_embedder.functions import *
 
 from pprint import pprint
-from konlpy.tag import Mecab
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.decomposition import TruncatedSVD
 
@@ -50,7 +46,3 @@ def get_topics(components, feature_names, n=10):
         print("Topic %d:" % (idx + 1), [(feature_names[i], topic[i].round(2)) for i in topic.argsort()[:-n - 1:-1]])
 
 get_topics(svd_model.components_, terms)
-# corpus = corpora.MmCorpus('/tmp/deerwester.mm')  # load a corpus of nine documents, from the Tutorials
-# id2word = corpora.Dictionary.load('/tmp/deerwester.dict')
-
-# run distributed LSA on nine documents
