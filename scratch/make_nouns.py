@@ -63,7 +63,7 @@ def make_nouns_file(filename):
 
 # filelist = ['corpora_mecab_938.pk']
 for idx, filename in enumerate(filelist):
-    print(f"{idx}/{len(filelist)} {filename}")
+    print(f"{idx + 1}/{len(filelist)} {filename}")
     t0 = now()
     make_nouns_file(filename)
     dur = now() - t0
