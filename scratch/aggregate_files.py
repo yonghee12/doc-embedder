@@ -24,16 +24,11 @@ filelist = [filename for filename in os.listdir(source_dir) if filename.startswi
 
 final_filename = 'book_nouns_agg.txt'
 final_filepath = os.path.join(source_dir, final_filename)
-# ff = open(final_filename, 'wb')
-ff = open(final_filepath, 'w')
-ff.write("hello\n\n")
-ff.close()
-ff = open(final_filepath, 'a')
-ff.write("world\n\n")
-ff.close()
+with open(final_filepath, 'w') as final:
+    final.write('')
 
-filelist = filelist[:2]
-for filename in filelist:
+
+def make_aggregated_file(filename):
     filepath = os.path.join(source_dir, filename)
 
     with open(filepath, 'rb') as f:
@@ -41,9 +36,22 @@ for filename in filelist:
     lines = raw.split("\n\n")
     texts = lines[1:]
 
-    tokens_matrix = []
-    for text in texts:
+    tokens_agg = set()
+    for text in tqdm(texts):
         spl = text.split(" ")
         if len(spl) > MIN_TOKENS:
             spl = ' '.join(spl)
-            tokens_matrix.append(spl)
+            tokens_agg.add(spl)
+
+    tokens_agg = '\n'.join(tokens_agg)
+    with open(final_filepath, 'ab') as final:
+        print(tokens_agg[:200])
+        final.write(tokens_agg.encode('utf8'))
+
+
+for idx, filename in enumerate(filelist):
+    print(f"{idx + 1}/{len(filelist)} {filename}")
+    t0 = now()
+    make_aggregated_file(filename)
+    dur = now() - t0
+    print(f"{idx + 1}/{len(filelist)} {filename} elapsed {dur / 60:.6f} min")
