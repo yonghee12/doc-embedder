@@ -67,4 +67,4 @@ for idx, filename in enumerate(filelist):
     t0 = now()
     make_nouns_file(filename)
     dur = now() - t0
-    print(f"{idx}/{len(filelist)} {filename} elapsed {dur / 60:.6f} min")
+    print(f"{idx + 1}/{len(filelist)} {filename} elapsed {dur / 60:.6f} min")
