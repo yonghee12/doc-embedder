@@ -7,6 +7,14 @@ from gensim import corpora, models
 import logging
 from pprint import pprint
 from konlpy.tag import Mecab
+import pickle
+import pandas as pd
+import numpy as np
+import gensim.models
+from tqdm import tqdm
+from string import punctuation
+from time import perf_counter as now
+from direct_redis import DirectRedis
 from gensim.models.callbacks import CallbackAny2Vec
 from time import perf_counter as now
 
@@ -50,3 +58,18 @@ class callback(CallbackAny2Vec):
         model.save(modelpath)
 
         self.epoch += 1
+
+
+# class TimerDecorator:
+#     def __init__(self, function, idx, filelist, filename):
+#         self.function = function
+#         self.idx = idx
+#         self.filelist = filelist
+#         self.filename = filename
+#
+#     def __call__(self, *args, **kwargs):
+#         print(f"{self.idx + 1}/{len(self.filelist)} {self.filename}")
+#         t0 = now()
+#         self._update_corpora_by_filename(self.filename)
+#         dur = now() - t0
+#         print(f"{idx + 1}/{len(self.filelist)} {filename} elapsed {dur / 60:.6f} min")
