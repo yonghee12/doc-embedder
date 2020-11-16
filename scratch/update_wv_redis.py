@@ -28,6 +28,14 @@ model = models.Word2Vec.load(modelpath)
 def get_vector(word):
     return model.wv.vectors[model.wv.vocab[word].index]
 
+
+def get_vector_safe(word):
+    if word in model.wv.vocab:
+        return model.wv.vectors[model.wv.vocab[word].index]
+    else:
+        return None
+
+
 # TODO: vector -> map -> redis 효율 로직
 for key in model.wv.vocab.keys():
     pass
