@@ -48,21 +48,55 @@ class VectorizeCorpora:
         # 'corpora_mecab_884.txt'
     ]
 
-    def __init__(self, source_dir, model=None, prefix=None, use_sample=False):
+    def __init__(self, source_dir, from_pickle=False, overwrite_pickle=False, model=None, prefix=None,
+                 source='bestseller'):
+        """
+        :param source_dir: 'all', 'sample', 'bestseller'
+        :param model:
+        :param prefix:
+        :param source:
+        """
         self.source_dir = source_dir
-        self.filelist = self._get_filelist(prefix) if not use_sample else self.samples
+        self.doc_savepath = os.path.join(source_dir, 'corpora_processed.pkl')
+        self.avgvec_savepath = os.path.join(source_dir, 'document_vectors.npy')
+        self.simindex_savepath = os.path.join(source_dir, 'similarity_index_matrix.npy')
+        self.idx2doc_savepath = os.path.join(source_dir, 'idx2doc.pkl')
+        self.doc2idx_savepath = os.path.join(source_dir, 'doc2idx.pkl')
+        self.overwrite_pickle = overwrite_pickle if not from_pickle else False
+        self.use_bestseller = True if source == 'bestseller' else False
+        self.doc2bid = None
+        self.bestsellers = self._get_bestseller_list() if self.use_bestseller else None
+        self.filelist = self.samples if source == 'sample' else self._get_filelist(prefix)
         self.corpora = dict()
         self.word2idx = {vocab: model.wv.vocab[vocab].index for vocab in model.wv.vocab.keys()}
         self.vectors = model.wv.vectors[:]
-        self._update_corpora()
         self.wv_mat = None
         self.idx2doc = None
         self.doc2idx = None
         self.norms = None
         self.similarity_matrix = None
 
+        if from_pickle:
+            print('Reading Pickle File..')
+            t0 = now()
+            with open(self.doc_savepath, 'rb') as f:
+                self.corpora = pickle.load(f)
+            print(f"Reading pickle took {(now() - t0) / 60:.2f} min")
+        else:
+            self._update_corpora()
+
     def upload_model(self, model):
         self.model = model
+
+    def load_averaged_docvec_matrix(self):
+        self.wv_mat = np.load(self.avgvec_savepath, fix_imports=False)
+        with open(self.idx2doc_savepath, 'rb') as f:
+            self.idx2doc = pickle.load(f)
+        with open(self.doc2idx_savepath, 'rb') as f:
+            self.doc2idx = pickle.load(f)
+
+    def load_document_similarity_matrix(self):
+        self.similarity_matrix = np.load(self.simindex_savepath, fix_imports=False)
 
     def _get_filelist(self, prefix):
         if prefix:
@@ -70,6 +104,12 @@ class VectorizeCorpora:
                     if filename.startswith(f"{prefix}")]
         else:
             return [filename for filename in os.listdir(self.source_dir)]
+
+    def _get_bestseller_list(self):
+        bestseller_path = os.path.join(ROOT, "bestseller.csv")
+        bestseller = pd.read_csv(bestseller_path, header=None)
+        self.doc2bid = {title: bid for title, bid in zip(bestseller.iloc[:, 2], bestseller.iloc[:, 0])}
+        return bestseller.iloc[:, 2].to_list()
 
     def _update_corpora(self):
         for idx, filename in enumerate(self.filelist):
@@ -84,6 +124,10 @@ class VectorizeCorpora:
         for key in self.corpora.keys():
             self.corpora[key] = list(chain.from_iterable([line.split(" ") for line in self.corpora[key]]))
 
+        if self.overwrite_pickle:
+            with open(self.doc_savepath, 'wb') as f:
+                pickle.dump(self.corpora, f)
+
     def _update_corpora_by_filename(self, filename):
         filepath = os.path.join(self.source_dir, filename)
 
@@ -94,6 +138,9 @@ class VectorizeCorpora:
         texts = lines[1:]
 
         for title, text in tqdm(zip(titles, texts)):
+            if self.use_bestseller and title not in self.bestsellers:
+                continue
+
             spl = text.split(" ")
             if len(spl) > MIN_TOKENS:
                 tokens = ' '.join(spl)
@@ -102,7 +149,7 @@ class VectorizeCorpora:
                 else:
                     self.corpora[title] = {tokens}
 
-    def make_document_vector_matrix(self):
+    def make_document_vector_matrix(self, save=False):
         wv_mat = []
         self.idx2doc = []
         self.doc2idx = {}
@@ -115,24 +162,38 @@ class VectorizeCorpora:
             self.doc2idx[title] = len(self.idx2doc) - 1
 
         self.wv_mat = np.array(wv_mat)
+
+        if save:
+            np.save(self.avgvec_savepath, self.wv_mat, fix_imports=False)
+            with open(self.idx2doc_savepath, 'wb') as f:
+                pickle.dump(self.idx2doc, f)
+            with open(self.doc2idx_savepath, 'wb') as f:
+                pickle.dump(self.doc2idx, f)
+
         return f"Total {len(self.idx2doc)} documents indexed."
 
-    def make_similarity_matrix(self):
+    def make_similarity_matrix(self, save):
         self.norms = np.linalg.norm(self.wv_mat, axis=1, keepdims=True)
         self.similarity_matrix = (self.wv_mat @ self.wv_mat.T) / (self.norms @ self.norms.T)
+        if save:
+            np.save(self.simindex_savepath, self.similarity_matrix, fix_imports=False)
 
-    def get_most_similar(self, doc_id):
+    def get_most_similar(self, doc_id, top=5, return_book_id=False):
         vector = self.similarity_matrix[doc_id]
-        top_indices = np.argpartition(-vector, 5)[:5]
+        top_indices = np.argpartition(-vector, top + 1)[:top + 1]
         sorted_top_indices = top_indices[np.argsort(-vector[top_indices])]
-        list(zip([self.idx2doc[i] for i in sorted_top_indices], vector[sorted_top_indices]))
-        return list(zip([self.idx2doc[i] for i in sorted_top_indices], vector[sorted_top_indices]))
+        sorted_top_indices = sorted_top_indices[1:]
+        if return_book_id:
+            return list(zip([self.doc2bid[self.idx2doc[i]] for i in sorted_top_indices], vector[sorted_top_indices]))
+        else:
+            return list(zip([self.idx2doc[i] for i in sorted_top_indices], vector[sorted_top_indices]))
 
-        for i in range(20, 40):
-            vector = self.similarity_matrix[i]
-            top_indices = np.argpartition(-vector, 5)[:5]
-            sorted_top_indices = top_indices[np.argsort(-vector[top_indices])]
-            print(list(zip([self.idx2doc[i] for i in sorted_top_indices], vector[sorted_top_indices])))
+    def get_most_similars_matrix(self, return_book_id=False):
+        self.most_similars = {}
+        for i in range(len(self.idx2doc)):
+            book_id = self.doc2bid[self.idx2doc[i]]
+            self.most_similars[book_id] = self.get_most_similar(i, 10, return_book_id)
+        return self.most_similars
 
     def get_vectors_from_tokens(self, tokens, pooling=None):
         vectors = []
@@ -141,7 +202,6 @@ class VectorizeCorpora:
             if vector is None:
                 continue
             vectors.append(vector)
-        np.array(vectors).mean(axis=0)
 
         if pooling == 'average' or pooling == 'avg':
             if not vectors:
@@ -165,27 +225,42 @@ modelfname = 'w2v_1160957_100d_epoch99_loss0.model'
 
 modelpath = os.path.join(model_dir, modelfname)
 model = gensim.models.Word2Vec.load(modelpath)
+model.wv.most_similar()
 #
 # word = '책임'
 # if word in word2idx:
 #     print(vectors[word2idx[word]])
 
-updater = VectorizeCorpora(source_dir, model=model, prefix='corpora', use_sample=True)
-updater.make_document_vector_matrix()
-updater.make_similarity_matrix()
-updater.get_most_similar(1)
-# with open(os.path.join(ROOT, 'updater.pkl'), 'wb') as f:
-#     pickle.dump(updater, f)
+corpora = VectorizeCorpora(source_dir, from_pickle=True, overwrite_pickle=False, model=model, prefix='corpora_mecab',
+                           source='bestseller')
+# corpora.make_document_vector_matrix(save=True)
+# corpora.make_similarity_matrix(save=True)
 
-r = DirectRedis(**BOOK_ID_MAPPING)
-len(updater.corpora)
+corpora.load_averaged_docvec_matrix()
+corpora.load_document_similarity_matrix()
 
-# wv_mat = np.random.random((5, 20))
-# cos_sim
-df = pd.DataFrame(cos_sim, columns=corpus_agg.index, index=corpus_agg.index)
-corpus_agg.index
-print(df)
-filename = "movie_agg.csv"
-path = os.path.join(ROOT, filename)
-df.to_csv(path, encoding='utf8')
-print('hellaosdf')
+print(corpora.get_most_similar(0, 5))
+sims = corpora.get_most_similars_matrix(return_book_id=True)
+
+path = os.path.join(ROOT, 'data', 'bestseller_most_similars.pkl')
+with open(path, 'wb') as f:
+    pickle.dump(sims, f)
+
+with open(path, 'rb') as f:
+    sims_load = pickle.load(f)
+
+# # with open(os.path.join(ROOT, 'updater.pkl'), 'wb') as f:
+# #     pickle.dump(updater, f)
+#
+# r = DirectRedis(**BOOK_ID_MAPPING)
+# len(updater.corpora)
+#
+# # wv_mat = np.random.random((5, 20))
+# # cos_sim
+# df = pd.DataFrame(cos_sim, columns=corpus_agg.index, index=corpus_agg.index)
+# corpus_agg.index
+# print(df)
+# filename = "movie_agg.csv"
+# path = os.path.join(ROOT, filename)
+# df.to_csv(path, encoding='utf8')
+# print('hellaosdf')
