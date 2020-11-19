@@ -217,50 +217,40 @@ class VectorizeCorpora:
             return None
 
 
-model_dir = '/home/ubuntu/yonghee/doc-embedder/trained_models'
+if __name__ == '__main__':
+    TRAIN = False
+    model_dir = '/home/ubuntu/yonghee/doc-embedder/trained_models'
 
-# modelfname = 'w2v_1160957_50d_epoch99_loss0.model'
-modelfname = 'w2v_1160957_100d_epoch99_loss0.model'
-# modelfname = 'w2v_1160957_200d_epoch99_loss0.model'
+    models = {
+        '50d': 'w2v_1160957_50d_epoch99_loss0.model',
+        '100d': 'w2v_1160957_100d_epoch99_loss0.model',
+        '200d': 'w2v_1160957_200d_epoch99_loss0.model'
+    }
+    # modelfname = 'w2v_1160957_50d_epoch99_loss0.model'
+    modelfname = 'w2v_1160957_100d_epoch99_loss0.model'
+    # modelfname = 'w2v_1160957_200d_epoch99_loss0.model'
 
-modelpath = os.path.join(model_dir, modelfname)
-model = gensim.models.Word2Vec.load(modelpath)
-model.wv.most_similar()
-#
-# word = '책임'
-# if word in word2idx:
-#     print(vectors[word2idx[word]])
+    modelpath = os.path.join(model_dir, modelfname)
+    model = gensim.models.Word2Vec.load(modelpath)
 
-corpora = VectorizeCorpora(source_dir, from_pickle=True, overwrite_pickle=False, model=model, prefix='corpora_mecab',
-                           source='bestseller')
-# corpora.make_document_vector_matrix(save=True)
-# corpora.make_similarity_matrix(save=True)
+    corpora = VectorizeCorpora(source_dir, from_pickle=True, overwrite_pickle=False, model=model, prefix='corpora_mecab',
+                               source='bestseller')
 
-corpora.load_averaged_docvec_matrix()
-corpora.load_document_similarity_matrix()
+    if TRAIN:
+        corpora.make_document_vector_matrix(save=True)
+        corpora.make_similarity_matrix(save=True)
+    else:
+        corpora.load_averaged_docvec_matrix()
+        corpora.load_document_similarity_matrix()
 
-print(corpora.get_most_similar(0, 5))
-sims = corpora.get_most_similars_matrix(return_book_id=True)
+    print(corpora.get_most_similar(0, 5))
+    sims = corpora.get_most_similars_matrix(return_book_id=True)
 
-path = os.path.join(ROOT, 'data', 'bestseller_most_similars.pkl')
-with open(path, 'wb') as f:
-    pickle.dump(sims, f)
+    # save most_similars
+    path = os.path.join(ROOT, 'data', 'bestseller_most_similars.pkl')
+    with open(path, 'wb') as f:
+        pickle.dump(sims, f)
 
-with open(path, 'rb') as f:
-    sims_load = pickle.load(f)
-
-# # with open(os.path.join(ROOT, 'updater.pkl'), 'wb') as f:
-# #     pickle.dump(updater, f)
-#
-# r = DirectRedis(**BOOK_ID_MAPPING)
-# len(updater.corpora)
-#
-# # wv_mat = np.random.random((5, 20))
-# # cos_sim
-# df = pd.DataFrame(cos_sim, columns=corpus_agg.index, index=corpus_agg.index)
-# corpus_agg.index
-# print(df)
-# filename = "movie_agg.csv"
-# path = os.path.join(ROOT, filename)
-# df.to_csv(path, encoding='utf8')
-# print('hellaosdf')
+    # load to test
+    with open(path, 'rb') as f:
+        sims_load = pickle.load(f)
