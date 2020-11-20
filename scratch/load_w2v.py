@@ -30,14 +30,18 @@ agg_filepath_sample = os.path.join(source_dir, agg_filename_sample)
 
 model_dir = '/home/ubuntu/yonghee/doc-embedder/trained_models'
 
-modelfname = 'w2v_1160957_50d_epoch99_loss0.model'
-modelfname = 'w2v_1160957_100d_epoch99_loss0.model'
-modelfname = 'w2v_1160957_200d_epoch99_loss0.model'
+# modelfname = 'w2v_1160957_50d_epoch99_loss0.model'
+modelfname100 = 'w2v_1160957_100d_epoch99_loss0.model'
+modelfname200 = 'w2v_1160957_200d_epoch99_loss0.model'
 
-modelpath = os.path.join(model_dir, modelfname)
-model2 = gensim.models.Word2Vec.load(modelpath)
+modelpath = os.path.join(model_dir, modelfname100)
+model100 = gensim.models.Word2Vec.load(modelpath)
+modelpath = os.path.join(model_dir, modelfname200)
+model200 = gensim.models.Word2Vec.load(modelpath)
+model = model100
+model.wv.most_similar('철학')
+model.wv.most_similar(positive=['할아버지'], negative=['젊음'])
 # model2 = gensim.models.Word2Vec.load(modelpath, encoding='utf8')
 
-print(model2.wv.most_similar(''))
 print('hello')
 print('asdfadsf')
