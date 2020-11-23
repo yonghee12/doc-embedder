@@ -10,10 +10,6 @@ from _config import *
 from doc_embedder.modules import *
 from doc_embedder.functions import *
 
-MIN_TOKENS = 5
-source_dir = '/home/ubuntu/yonghee/doc-embedder/book_nouns'
-
-
 def get_vector(model, word):
     if word in model.wv.vocab:
         return model.wv.vectors[model.wv.vocab[word].index]
@@ -48,7 +44,7 @@ class VectorizeCorpora:
         # 'corpora_mecab_884.txt'
     ]
 
-    def __init__(self, source_dir, from_pickle=False, overwrite_pickle=False, model=None, prefix=None,
+    def __init__(self, source_dir, nickname, from_pickle=False, overwrite_pickle=False, model=None, prefix=None,
                  source='bestseller'):
         """
         :param source_dir: 'all', 'sample', 'bestseller'
@@ -57,11 +53,12 @@ class VectorizeCorpora:
         :param source:
         """
         self.source_dir = source_dir
-        self.doc_savepath = os.path.join(source_dir, 'corpora_processed.pkl')
-        self.avgvec_savepath = os.path.join(source_dir, 'document_vectors.npy')
-        self.simindex_savepath = os.path.join(source_dir, 'similarity_index_matrix.npy')
-        self.idx2doc_savepath = os.path.join(source_dir, 'idx2doc.pkl')
-        self.doc2idx_savepath = os.path.join(source_dir, 'doc2idx.pkl')
+        self.nickname = nickname
+        self.doc_savepath = os.path.join(source_dir, f'{nickname}_corpora_processed.pkl')
+        self.avgvec_savepath = os.path.join(source_dir, f'{nickname}_document_vectors.npy')
+        self.simindex_savepath = os.path.join(source_dir, f'{nickname}_similarity_index_matrix.npy')
+        self.idx2doc_savepath = os.path.join(source_dir, f'{nickname}_idx2doc.pkl')
+        self.doc2idx_savepath = os.path.join(source_dir, f'{nickname}_doc2idx.pkl')
         self.overwrite_pickle = overwrite_pickle if not from_pickle else False
         self.use_bestseller = True if source == 'bestseller' else False
         self.doc2bid = None
@@ -172,7 +169,7 @@ class VectorizeCorpora:
 
         return f"Total {len(self.idx2doc)} documents indexed."
 
-    def make_similarity_matrix(self, save):
+    def make_similarity_matrix(self, save=True):
         self.norms = np.linalg.norm(self.wv_mat, axis=1, keepdims=True)
         self.similarity_matrix = (self.wv_mat @ self.wv_mat.T) / (self.norms @ self.norms.T)
         if save:
@@ -218,25 +215,36 @@ class VectorizeCorpora:
 
 
 if __name__ == '__main__':
-    TRAIN = False
-    model_dir = '/home/ubuntu/yonghee/doc-embedder/trained_models'
+    MAKE_DOCVEC = True
+
+    MIN_TOKENS = 5
+    source_dir = '/home/yonghee/yonghee/doc-embedder/book_nouns'
 
     models = {
-        '50d': 'w2v_1160957_50d_epoch99_loss0.model',
-        '100d': 'w2v_1160957_100d_epoch99_loss0.model',
-        '200d': 'w2v_1160957_200d_epoch99_loss0.model'
+        'review': {
+            'dir': '/home/yonghee/yonghee/doc-embedder/trained_models',
+            '50d': '50d/w2v_1160957_50d_epoch99_loss0.model',
+            '100d': '100d/w2v_1160957_100d_epoch99_loss0.model',
+            '200d': '200d/w2v_1160957_200d_epoch99_loss0.model'
+        },
+        'review_content_wiki': {
+            'dir': '/home/yonghee/yonghee/doc-embedder/trained_models/review_content_wiki',
+            '50d': '50d/w2v_2998865_50d_epoch99_loss0.model',
+            '100d': '100d/w2v_2998865_100d_epoch99_loss0.model',
+            '200d': '200d/w2v_2998865_200d_epoch99_loss0.model'
+        }
     }
-    # modelfname = 'w2v_1160957_50d_epoch99_loss0.model'
-    modelfname = 'w2v_1160957_100d_epoch99_loss0.model'
-    # modelfname = 'w2v_1160957_200d_epoch99_loss0.model'
+    model_info = models['review_content_wiki']
 
-    modelpath = os.path.join(model_dir, modelfname)
+    modelpath = os.path.join(model_info['dir'], model_info['200d'])
     model = gensim.models.Word2Vec.load(modelpath)
+    # model = None
 
-    corpora = VectorizeCorpora(source_dir, from_pickle=True, overwrite_pickle=False, model=model, prefix='corpora_mecab',
+    corpora = VectorizeCorpora(source_dir, 'all_200d', from_pickle=False, overwrite_pickle=True, model=model,
+                               prefix='corpora_mecab',
                                source='bestseller')
 
-    if TRAIN:
+    if MAKE_DOCVEC:
         corpora.make_document_vector_matrix(save=True)
         corpora.make_similarity_matrix(save=True)
     else:
@@ -244,6 +252,14 @@ if __name__ == '__main__':
         corpora.load_document_similarity_matrix()
 
     print(corpora.get_most_similar(0, 5))
+    sims = corpora.get_most_similars_matrix(return_book_id=False)
+
+    # save most_similars
+    path = os.path.join(ROOT, 'data', 'bestseller_most_similars_bookname.pkl')
+    with open(path, 'wb') as f:
+        pickle.dump(sims, f)
+
+    del sims
     sims = corpora.get_most_similars_matrix(return_book_id=True)
 
     # save most_similars
@@ -252,5 +268,7 @@ if __name__ == '__main__':
         pickle.dump(sims, f)
 
     # load to test
+    import pickle
     with open(path, 'rb') as f:
         sims_load = pickle.load(f)
+
