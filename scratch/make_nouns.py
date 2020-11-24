@@ -24,8 +24,9 @@ def get_book_name_from_book_id(book_id):
     return r.hget("book_id", f'{book_id}:book_name')
 
 
-source_dir = '/home/ubuntu/corpora/book_content'
-filelist = [filename for filename in os.listdir(source_dir) if filename.startswith("corpora_")]
+source_dir = '/corpora/book_content'
+filelist = [filename for filename in os.listdir(source_dir)
+            if filename.startswith("corpora_") and filename.endswith('_r.pk') and not filename.endswith("r_r.pk")]
 
 allowed_pos = {
     'NNG',
@@ -33,38 +34,49 @@ allowed_pos = {
 }
 
 
-def make_nouns_file(filename):
+def make_nouns_file(filename, return_book_name=False):
     path = os.path.join(source_dir, filename)
     corpora = pd.read_pickle(path)
 
-    book_name_agg, nouns_agg = '', ''
+    book_index_agg, nouns_agg = '', ''
     for corpus in tqdm(corpora):
-        bid, tokens = corpus
-        book_name = get_book_name_from_book_id(bid)
+        # for corpus in corpora:
+        book_id, rep_id, tokens = corpus
+        book_index = get_book_name_from_book_id(book_id) if return_book_name else rep_id
         nouns = [tok for tok, pos in tokens if pos in allowed_pos]
 
         if nouns:
-            book_name_agg += str(book_name) + '\t\t'
+            book_index_agg += str(book_index) + '\t\t'
             nouns_agg += ' '.join(nouns) + '\n\n'
 
     if not nouns_agg:
         return None
 
-    nouns_agg = nouns_agg[:-2]
+    nouns_agg = nouns_agg[:-2]  # 마지막 \n\n 제거
 
     filename_nouns = filename.split(".")[0] + '.txt'
-    save_dir = '/home/ubuntu/yonghee/doc-embedder/book_nouns'
+    save_dir = '/home/yonghee/yonghee/doc-embedder/book_nouns'
     savepath = os.path.join(save_dir, filename_nouns)
 
     with open(savepath, 'wb') as f:
-        write = book_name_agg + '\n\n' + nouns_agg
+        write = book_index_agg + '\n\n' + nouns_agg
         f.write(write.encode('utf8'))
 
 
-# filelist = ['corpora_mecab_938.pk']
-for idx, filename in enumerate(filelist):
-    print(f"{idx + 1}/{len(filelist)} {filename}")
-    t0 = now()
-    make_nouns_file(filename)
-    dur = now() - t0
-    print(f"{idx + 1}/{len(filelist)} {filename} elapsed {dur / 60:.6f} min")
+if __name__ == '__main__':
+    BOOK_NAME = False
+    # filelist = [
+    #     'corpora_mecab_881_r.pk',
+    #     'corpora_mecab_87_r.pk',
+    #     'corpora_mecab_925_r.pk',
+    #     'corpora_mecab_911_r.pk',
+    # ]
+
+    for idx, filename in enumerate(filelist):
+        print(f"{idx + 1}/{len(filelist)} {filename}")
+        t0 = now()
+        make_nouns_file(filename, return_book_name=BOOK_NAME)
+        dur = now() - t0
+        print(f"{idx + 1}/{len(filelist)} {filename} elapsed {dur / 60:.6f} min")
+
+    print('hello')
