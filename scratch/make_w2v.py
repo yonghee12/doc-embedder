@@ -1,3 +1,6 @@
+#!/home/ubuntu/.yonghee_env/bin/python3
+# -*- coding: utf-8 -*-
+
 import sys
 from pathlib import Path
 
@@ -18,15 +21,6 @@ from progress_timer import Timer
 from _config import *
 from doc_embedder.modules import *
 from doc_embedder.functions import *
-
-r = DirectRedis(**BOOK_ID_MAPPING)
-
-source_dir = '/home/ubuntu/yonghee/doc-embedder/book_nouns'
-agg_filename = 'book_nouns_agg.txt'
-agg_filepath = os.path.join(source_dir, agg_filename)
-
-agg_filename_sample = 'book_nouns_agg_sample.txt'
-agg_filepath_sample = os.path.join(source_dir, agg_filename_sample)
 
 
 def make_sample(max_lines, original_path, sample_path):
@@ -49,12 +43,24 @@ def make_sample(max_lines, original_path, sample_path):
                     return None
 
 
-model_dir = '/home/ubuntu/yonghee/doc-embedder/trained_models'
+source_dir = '/home/ubuntu/yonghee/doc-embedder/book_nouns'
+agg_filename_all = 'nouns_agg_all.txt'
+agg_filepath_all = os.path.join(source_dir, agg_filename_all)
+
+agg_filename = 'book_nouns_agg.txt'
+agg_filepath = os.path.join(source_dir, agg_filename)
+
+agg_filename_sample = 'book_nouns_agg_sample.txt'
+agg_filepath_sample = os.path.join(source_dir, agg_filename_sample)
+
+model_dir_parent = '/home/ubuntu/yonghee/doc-embedder/trained_models/review_content_wiki'
 # make_sample(10000, agg_filepath, agg_filepath_sample)
+epochs = 100
 print('start training')
 for vector_size in [50, 100, 200]:
-    corpus = agg_filepath
-    # corpus = agg_filepath_sample
+    corpus = agg_filepath_all
+
+    model_dir = model_dir_parent + f'/{vector_size}d'
     model_config = {
         'corpus_file': corpus,
         'size': vector_size,
@@ -67,8 +73,16 @@ for vector_size in [50, 100, 200]:
         "compute_loss": True,
         "workers": 24
     }
+    print(f'{vector_size}d building vocab...')
+    t0 = now()
     model = gensim.models.Word2Vec(**model_config, seed=42)
-    print(model.wv.most_similar('사랑'))
+    dur = now() - t0
+    print(f"Building took {dur:.2f} sec, {dur / 60:.2f} min")
+
+    try:
+        print(model.wv.most_similar('사랑'))
+    except Exception as e:
+        print(str(e))
 
     train_config = {
         'corpus_file': corpus,
@@ -78,11 +92,19 @@ for vector_size in [50, 100, 200]:
         'report_delay': 0.1,
         'total_examples': model.corpus_count,
         'total_words': model.corpus_total_words,
-        'epochs': 100,
+        'epochs': epochs,
     }
 
+    print(f'{vector_size}d training start...')
+    t0 = now()
     model.train(**train_config)
-    print(model.wv.most_similar('사랑'))
+    dur = now() - t0
+    print(f"training {epochs} epochs took {dur:.2f} sec, {dur / 60:.2f} min")
+
+    try:
+        print(model.wv.most_similar('사랑'))
+    except Exception as e:
+        print(str(e))
 
 # model_dir = '/home/ubuntu/yonghee/doc-embedder/trained_models'
 # modelfname = 'w2v_20031_50d_epoch2_loss406002.model'
