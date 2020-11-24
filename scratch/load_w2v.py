@@ -21,27 +21,56 @@ from doc_embedder.functions import *
 
 r = DirectRedis(**BOOK_ID_MAPPING)
 
-source_dir = '/home/ubuntu/yonghee/doc-embedder/book_nouns'
-agg_filename = 'book_nouns_agg.txt'
-agg_filepath = os.path.join(source_dir, agg_filename)
+model_dir = '/home/yonghee/yonghee/doc-embedder/trained_models/review'
+modelfname50 = '50d/w2v_1160957_50d_epoch99_loss0.model'
+# modelfname100 = 'w2v_1160957_100d_epoch99_loss0.model'
+# modelfname200 = 'w2v_1160957_200d_epoch99_loss0.model'
 
-agg_filename_sample = 'book_nouns_agg_sample.txt'
-agg_filepath_sample = os.path.join(source_dir, agg_filename_sample)
+model_dir = '/home/yonghee/yonghee/doc-embedder/trained_models/review_content_wiki'
+modelfname50 = '50d/w2v_2998865_50d_epoch99_loss0.model'
+modelfname100 = '100d/w2v_2998865_100d_epoch99_loss0.model'
+modelfname200 = '200d/w2v_2998865_200d_epoch99_loss0.model'
 
-model_dir = '/home/ubuntu/yonghee/doc-embedder/trained_models'
-
-# modelfname = 'w2v_1160957_50d_epoch99_loss0.model'
-modelfname100 = 'w2v_1160957_100d_epoch99_loss0.model'
-modelfname200 = 'w2v_1160957_200d_epoch99_loss0.model'
-
-modelpath = os.path.join(model_dir, modelfname100)
-model100 = gensim.models.Word2Vec.load(modelpath)
+# modelpath = os.path.join(model_dir, modelfname50)
+# model50 = gensim.models.Word2Vec.load(modelpath)
+# modelpath = os.path.join(model_dir, modelfname100)
+# model100 = gensim.models.Word2Vec.load(modelpath)
 modelpath = os.path.join(model_dir, modelfname200)
 model200 = gensim.models.Word2Vec.load(modelpath)
-model = model100
-model.wv.most_similar('철학')
-model.wv.most_similar(positive=['할아버지'], negative=['젊음'])
-# model2 = gensim.models.Word2Vec.load(modelpath, encoding='utf8')
+model = model200
+model.wv.most_similar('자동차')
+model.wv.most_similar('런닝')
+model.wv.most_similar('파리')
+model.wv.most_similar(positive=['사람', '새'], negative=['집'])
+model.wv.similarity('조깅', '러닝')
+
+
+
+
+
+
+
+# SAVING DICTIONARY
+save_dir = '/home/yonghee/yonghee/doc-embedder/trained_models'
+modelfname200 = 'w2v_dict_2998865_200d_epoch99_loss0.pkl'
+savepath = os.path.join(save_dir, modelfname200)
+word2vec = {vocab: model.wv.vectors[model.wv.vocab[vocab].index] for vocab in model.wv.vocab.keys()}
+
+with open(savepath, 'wb') as f:
+    pickle.dump(word2vec, f)
 
 print('hello')
-print('asdfadsf')
+
+# LOADING DICTIONARY
+del word2vec
+import os
+import gensim
+import pickle
+save_dir = '/home/yonghee/yonghee/doc-embedder/trained_models'
+modelfname200 = 'w2v_dict_2998865_200d_epoch99_loss0.pkl'
+savepath = os.path.join(save_dir, modelfname200)
+with open(savepath, 'rb') as f:
+    w2v = pickle.load(f)
+print(w2v.get("사랑")[:5])
+
+model.wv.get_vector('사랑') == w2v.get("사랑")
