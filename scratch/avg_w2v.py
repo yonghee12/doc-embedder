@@ -10,6 +10,36 @@ from _config import *
 from doc_embedder.modules import *
 from doc_embedder.functions import *
 
+from biblyhouse.base import BookHandlerBM
+
+r = DirectRedis(**BOOK_ID_MAPPING)
+r_group = DirectRedis(**GROUP_ID_MAPPING)
+
+
+def get_book_name_from_book_id(book_id):
+    return r.hget("book_id", f'{book_id}:book_name')
+
+
+def get_book_id_from_group_id(group_id):
+    # group_id = 'S4EDD961D81F6BF04'
+    group = r_group.lrange(group_id, start=0, end=0)
+    if group:
+        book_id = group[0]
+        firstcontent = r_group.hget('firstcontent', book_id)
+        return firstcontent if firstcontent else book_id
+    else:
+        return None
+
+
+def get_book_name_from_book_index(index):
+    """
+    get book name from book index which can be book_id or group_id
+    """
+    book_id = get_book_id_from_group_id(index)
+    book_id = book_id if book_id is not None else index
+    return get_book_name_from_book_id(book_id)
+
+
 def get_vector(model, word):
     if word in model.wv.vocab:
         return model.wv.vectors[model.wv.vocab[word].index]
@@ -35,22 +65,13 @@ def get_vectors_from_tokens(model, tokens, pooling=None):
 
 class VectorizeCorpora:
     samples = [
-        'corpora_mecab_880.txt',
-        'corpora_mecab_938.txt',
-        'corpora_mecab_97.txt',
-        'corpora_mecab_910.txt',
-        'corpora_mecab_936.txt',
-        'corpora_mecab_80.txt'
-        # 'corpora_mecab_884.txt'
+        'corpora_mecab_925_r.txt'
     ]
 
     def __init__(self, source_dir, nickname, from_pickle=False, overwrite_pickle=False, model=None, prefix=None,
-                 source='bestseller'):
+                 suffix=None, source='bestseller'):
         """
         :param source_dir: 'all', 'sample', 'bestseller'
-        :param model:
-        :param prefix:
-        :param source:
         """
         self.source_dir = source_dir
         self.nickname = nickname
@@ -62,8 +83,8 @@ class VectorizeCorpora:
         self.overwrite_pickle = overwrite_pickle if not from_pickle else False
         self.use_bestseller = True if source == 'bestseller' else False
         self.doc2bid = None
-        self.bestsellers = self._get_bestseller_list() if self.use_bestseller else None
-        self.filelist = self.samples if source == 'sample' else self._get_filelist(prefix)
+        self.bestsellers = self._get_bestseller_set() if self.use_bestseller else None
+        self.filelist = self.samples if source == 'sample' else self._get_filelist(prefix, suffix)
         self.corpora = dict()
         self.word2idx = {vocab: model.wv.vocab[vocab].index for vocab in model.wv.vocab.keys()}
         self.vectors = model.wv.vectors[:]
@@ -95,18 +116,30 @@ class VectorizeCorpora:
     def load_document_similarity_matrix(self):
         self.similarity_matrix = np.load(self.simindex_savepath, fix_imports=False)
 
-    def _get_filelist(self, prefix):
-        if prefix:
-            return [filename for filename in os.listdir(self.source_dir)
-                    if filename.startswith(f"{prefix}")]
+    def _get_filelist(self, prefix, suffix):
+        prefix = 'corpora_mecab'
+        suffix = '_r.txt'
+        if prefix or suffix:
+            if not prefix:
+                return [fname for fname in os.listdir(self.source_dir) if fname.endswith(str(suffix))]
+            elif not suffix:
+                return [fname for fname in os.listdir(self.source_dir) if fname.startswith(str(prefix))]
+            else:
+                return [fname for fname in os.listdir(self.source_dir)
+                        if fname.startswith(str(prefix)) and fname.endswith(str(suffix))]
         else:
-            return [filename for filename in os.listdir(self.source_dir)]
+            return os.listdir(self.source_dir)
 
-    def _get_bestseller_list(self):
+    def _get_bestseller_set(self):
+        bh = BookHandlerBM()
         bestseller_path = os.path.join(ROOT, "bestseller.csv")
         bestseller = pd.read_csv(bestseller_path, header=None)
+        bestseller_book_ids = set(bestseller.iloc[:, 0])
+        print('making bestseller group_id index...')
+        for book_id in tqdm(list(bestseller_book_ids)):
+            bestseller_book_ids.add(bh.get_recom_id(book_id))
         self.doc2bid = {title: bid for title, bid in zip(bestseller.iloc[:, 2], bestseller.iloc[:, 0])}
-        return bestseller.iloc[:, 2].to_list()
+        return bestseller_book_ids
 
     def _update_corpora(self):
         for idx, filename in enumerate(self.filelist):
@@ -116,13 +149,14 @@ class VectorizeCorpora:
             dur = now() - t0
             printstr = f"{idx + 1}/{len(self.filelist)} {filename}"
             printstr += f" {dur / 60:.6f} min" if dur > 120 else f" {dur:.6f} sec"
-            print(printstr + " elapsed")
+            print(printstr + f" elapsed, total keys: {len(self.corpora)}")
 
         for key in self.corpora.keys():
             self.corpora[key] = list(chain.from_iterable([line.split(" ") for line in self.corpora[key]]))
 
         if self.overwrite_pickle:
             with open(self.doc_savepath, 'wb') as f:
+                print('writing pickle file...')
                 pickle.dump(self.corpora, f)
 
     def _update_corpora_by_filename(self, filename):
@@ -131,32 +165,32 @@ class VectorizeCorpora:
         with open(filepath, 'rb') as f:
             raw = f.read().decode("utf8")
         lines = raw.split("\n\n")
-        titles = lines[0].split('\t\t')[:-1]
+        indices = lines[0].split('\t\t')[:-1]
         texts = lines[1:]
 
-        for title, text in tqdm(zip(titles, texts)):
-            if self.use_bestseller and title not in self.bestsellers:
+        for index, text in tqdm(zip(indices, texts)):
+            if self.use_bestseller and index not in self.bestsellers:
                 continue
 
             spl = text.split(" ")
             if len(spl) > MIN_TOKENS:
                 tokens = ' '.join(spl)
-                if title in self.corpora:
-                    self.corpora[title].add(tokens)
+                if index in self.corpora:
+                    self.corpora[index].add(tokens)
                 else:
-                    self.corpora[title] = {tokens}
+                    self.corpora[index] = {tokens}
 
     def make_document_vector_matrix(self, save=False):
         wv_mat = []
         self.idx2doc = []
         self.doc2idx = {}
-        for title, tokens in tqdm(self.corpora.items()):
+        for book_id, tokens in tqdm(self.corpora.items()):
             vector = self.get_vectors_from_tokens(tokens, pooling='average')
             if vector is None:
                 raise Exception("no vector")
             wv_mat.append(vector)
-            self.idx2doc.append(title)
-            self.doc2idx[title] = len(self.idx2doc) - 1
+            self.idx2doc.append(book_id)
+            self.doc2idx[book_id] = len(self.idx2doc) - 1
 
         self.wv_mat = np.array(wv_mat)
 
@@ -175,21 +209,18 @@ class VectorizeCorpora:
         if save:
             np.save(self.simindex_savepath, self.similarity_matrix, fix_imports=False)
 
-    def get_most_similar(self, doc_id, top=5, return_book_id=False):
+    def get_most_similar(self, doc_id, top=5):
         vector = self.similarity_matrix[doc_id]
         top_indices = np.argpartition(-vector, top + 1)[:top + 1]
         sorted_top_indices = top_indices[np.argsort(-vector[top_indices])]
         sorted_top_indices = sorted_top_indices[1:]
-        if return_book_id:
-            return list(zip([self.doc2bid[self.idx2doc[i]] for i in sorted_top_indices], vector[sorted_top_indices]))
-        else:
-            return list(zip([self.idx2doc[i] for i in sorted_top_indices], vector[sorted_top_indices]))
+        return list(zip([self.idx2doc[i] for i in sorted_top_indices], vector[sorted_top_indices]))
 
-    def get_most_similars_matrix(self, return_book_id=False):
+    def get_most_similars_matrix(self, top_n=10):
         self.most_similars = {}
         for i in range(len(self.idx2doc)):
-            book_id = self.doc2bid[self.idx2doc[i]]
-            self.most_similars[book_id] = self.get_most_similar(i, 10, return_book_id)
+            book_index = self.idx2doc[i]
+            self.most_similars[book_index] = self.get_most_similar(i, top_n)
         return self.most_similars
 
     def get_vectors_from_tokens(self, tokens, pooling=None):
@@ -238,13 +269,20 @@ if __name__ == '__main__':
 
     modelpath = os.path.join(model_info['dir'], model_info['200d'])
     model = gensim.models.Word2Vec.load(modelpath)
+    print(model.wv.most_similar('사랑'))
     # model = None
 
-    corpora = VectorizeCorpora(source_dir, 'all_200d', from_pickle=False, overwrite_pickle=True, model=model,
+    corpora = VectorizeCorpora(source_dir,
+                               nickname='rep_all_200d',
+                               from_pickle=False,
+                               overwrite_pickle=True,
+                               model=model,
                                prefix='corpora_mecab',
+                               suffix='_r.txt',
                                source='bestseller')
 
     if MAKE_DOCVEC:
+        print('making document vectors.. ')
         corpora.make_document_vector_matrix(save=True)
         corpora.make_similarity_matrix(save=True)
     else:
@@ -252,23 +290,29 @@ if __name__ == '__main__':
         corpora.load_document_similarity_matrix()
 
     print(corpora.get_most_similar(0, 5))
-    sims = corpora.get_most_similars_matrix(return_book_id=False)
+    sims = corpora.get_most_similars_matrix()
+    name_func = get_book_name_from_book_index
 
-    # save most_similars
-    path = os.path.join(ROOT, 'data', 'bestseller_most_similars_bookname.pkl')
-    with open(path, 'wb') as f:
-        pickle.dump(sims, f)
-
-    del sims
-    sims = corpora.get_most_similars_matrix(return_book_id=True)
+    df = pd.DataFrame(sims)
+    print(df.head())
+    df.to_csv('book_sims_book_id.csv', encoding='utf8')
+    df.T.to_csv('book_sims_book_id_T.csv', encoding='utf8')
 
     # save most_similars
     path = os.path.join(ROOT, 'data', 'bestseller_most_similars.pkl')
     with open(path, 'wb') as f:
         pickle.dump(sims, f)
 
-    # load to test
-    import pickle
-    with open(path, 'rb') as f:
-        sims_load = pickle.load(f)
+    BOOK_NAME = True
+    if BOOK_NAME:
+        sims_name = {name_func(k): [(name_func(i), s,) for i, s in v] for k, v in sims.items()}
 
+    df = pd.DataFrame(sims_name)
+    print(df.head())
+    df.to_csv('book_sims_bookname.csv', encoding='utf8')
+    df.T.to_csv('book_sims_bookname_T.csv', encoding='utf8')
+
+    # load to test
+    # import pickle
+    # with open(path, 'rb') as f:
+    #     sims_load = pickle.load(f)
