@@ -246,7 +246,7 @@ class VectorizeCorpora:
 
 
 if __name__ == '__main__':
-    MAKE_DOCVEC = True
+    MAKE_DOCVEC = False
 
     MIN_TOKENS = 5
     source_dir = '/home/yonghee/yonghee/doc-embedder/book_nouns'
@@ -274,8 +274,8 @@ if __name__ == '__main__':
 
     corpora = VectorizeCorpora(source_dir,
                                nickname='rep_all_200d',
-                               from_pickle=False,
-                               overwrite_pickle=True,
+                               from_pickle=True,
+                               overwrite_pickle=False,
                                model=model,
                                prefix='corpora_mecab',
                                suffix='_r.txt',
@@ -295,8 +295,9 @@ if __name__ == '__main__':
 
     df = pd.DataFrame(sims)
     print(df.head())
-    df.to_csv('book_sims_book_id.csv', encoding='utf8')
-    df.T.to_csv('book_sims_book_id_T.csv', encoding='utf8')
+
+    df.to_csv(os.path.join(ROOT, 'data', 'book_sims_book_id.csv'), encoding='utf8')
+    df.T.to_csv(os.path.join(ROOT, 'data', 'book_sims_book_id_T.csv'), encoding='utf8')
 
     # save most_similars
     path = os.path.join(ROOT, 'data', 'bestseller_most_similars.pkl')
@@ -309,8 +310,8 @@ if __name__ == '__main__':
 
     df = pd.DataFrame(sims_name)
     print(df.head())
-    df.to_csv('book_sims_bookname.csv', encoding='utf8')
-    df.T.to_csv('book_sims_bookname_T.csv', encoding='utf8')
+    df.to_csv(os.path.join(ROOT, 'data', 'book_sims_bookname.csv'), encoding='utf8')
+    df.T.to_csv(os.path.join(ROOT, 'data', 'book_sims_bookname_T.csv'), encoding='utf8')
 
     # load to test
     # import pickle
