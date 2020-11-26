@@ -73,3 +73,4 @@ class callback(CallbackAny2Vec):
 #         self._update_corpora_by_filename(self.filename)
 #         dur = now() - t0
 #         print(f"{idx + 1}/{len(self.filelist)} {filename} elapsed {dur / 60:.6f} min")
+
