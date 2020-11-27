@@ -21,20 +21,25 @@ from doc_embedder.functions import *
 
 r = DirectRedis(**BOOK_ID_MAPPING)
 
-model_dir = '/home/yonghee/yonghee/doc-embedder/trained_models/review'
-modelfname50 = '50d/w2v_1160957_50d_epoch99_loss0.model'
-# modelfname100 = 'w2v_1160957_100d_epoch99_loss0.model'
-# modelfname200 = 'w2v_1160957_200d_epoch99_loss0.model'
+models = {
+    'review': {
+        'dir': '/home/yonghee/yonghee/doc-embedder/trained_models',
+        '50d': '50d/w2v_1160957_50d_epoch99_loss0.model',
+        '100d': '100d/w2v_1160957_100d_epoch99_loss0.model',
+        '200d': '200d/w2v_1160957_200d_epoch99_loss0.model'
+    },
+    'review_content_wiki': {
+        'dir': '/home/yonghee/yonghee/doc-embedder/trained_models/review_content_wiki',
+        '50d': '50d/w2v_2998865_50d_epoch99_loss0.model',
+        '100d': '100d/w2v_2998865_100d_epoch99_loss0.model',
+        '200d': '200d/w2v_2998865_200d_epoch99_loss0.model'
+    }
+}
+model_info = models['review_content_wiki']
 
-model_dir = '/home/yonghee/yonghee/doc-embedder/trained_models/review_content_wiki'
-modelfname50 = '50d/w2v_2998865_50d_epoch99_loss0.model'
-modelfname100 = '100d/w2v_2998865_100d_epoch99_loss0.model'
-modelfname200 = '200d/w2v_2998865_200d_epoch99_loss0.model'
+modelpath = os.path.join(model_info['dir'], model_info['200d'])
+model = gensim.models.Word2Vec.load(modelpath)
 
-# modelpath = os.path.join(model_dir, modelfname50)
-# model50 = gensim.models.Word2Vec.load(modelpath)
-# modelpath = os.path.join(model_dir, modelfname100)
-# model100 = gensim.models.Word2Vec.load(modelpath)
 modelpath = os.path.join(model_dir, modelfname200)
 model200 = gensim.models.Word2Vec.load(modelpath)
 model = model200
@@ -43,12 +48,6 @@ model.wv.most_similar('런닝')
 model.wv.most_similar('파리')
 model.wv.most_similar(positive=['사람', '새'], negative=['집'])
 model.wv.similarity('조깅', '러닝')
-
-
-
-
-
-
 
 # SAVING DICTIONARY
 save_dir = '/home/yonghee/yonghee/doc-embedder/trained_models'
@@ -66,6 +65,7 @@ del word2vec
 import os
 import gensim
 import pickle
+
 save_dir = '/home/yonghee/yonghee/doc-embedder/trained_models'
 modelfname200 = 'w2v_dict_2998865_200d_epoch99_loss0.pkl'
 savepath = os.path.join(save_dir, modelfname200)
