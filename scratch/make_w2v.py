@@ -68,7 +68,6 @@ for vector_size in [50, 100, 200]:
         "sg": 0,
         "hs": 0,
         "iter": 0,
-        # "callbacks": [callback()],
         'callbacks': [callback(save_dir=model_dir)],
         "compute_loss": True,
         "workers": 24
