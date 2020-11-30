@@ -67,4 +67,16 @@ with open(savepath, 'rb') as f:
     w2v = pickle.load(f)
 print(w2v.get("사랑")[:5])
 
+
+def cos(a, b):
+    return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+
+
+def cos_word(w1, w2):
+    v1, v2 = w2v.get(w1), w2v.get(w2)
+    if v1 is None or v2 is None:
+        return None
+    return cos(v1, v2)
+
+cos_word('사랑', '우정')
 model.wv.get_vector('사랑') == w2v.get("사랑")
