@@ -40,13 +40,7 @@ model_info = models['review_content_wiki']
 modelpath = os.path.join(model_info['dir'], model_info['200d'])
 model = gensim.models.Word2Vec.load(modelpath)
 
-modelpath = os.path.join(model_dir, modelfname200)
-model200 = gensim.models.Word2Vec.load(modelpath)
-model = model200
 model.wv.most_similar('자동차')
-model.wv.most_similar('런닝')
-model.wv.most_similar('파리')
-model.wv.most_similar(positive=['사람', '새'], negative=['집'])
 model.wv.similarity('조깅', '러닝')
 
 # SAVING DICTIONARY
