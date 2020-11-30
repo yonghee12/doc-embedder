@@ -40,7 +40,6 @@ def make_nouns_file(filename, return_book_name=False):
 
     book_index_agg, nouns_agg = '', ''
     for corpus in tqdm(corpora):
-        # for corpus in corpora:
         book_id, rep_id, tokens = corpus
         book_index = get_book_name_from_book_id(book_id) if return_book_name else rep_id
         nouns = [tok for tok, pos in tokens if pos in allowed_pos]
