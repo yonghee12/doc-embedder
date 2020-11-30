@@ -21,7 +21,6 @@ def get_book_name_from_book_id(book_id):
 
 
 def get_book_id_from_group_id(group_id):
-    # group_id = 'S4EDD961D81F6BF04'
     group = r_group.lrange(group_id, start=0, end=0)
     if group:
         book_id = group[0]
@@ -310,7 +309,7 @@ if __name__ == '__main__':
 
     df = pd.DataFrame(sims_name)
     print(df.head())
-    df.to_csv(os.path.join(ROOT, 'data', 'book_sims_bookname.csv'), encoding='utf8')
+    df.to_csv(os.path.join(ROOT, 'data', 'book_sims_bookna~me.csv'), encoding='utf8')
     df.T.to_csv(os.path.join(ROOT, 'data', 'book_sims_bookname_T.csv'), encoding='utf8')
 
     # load to test
